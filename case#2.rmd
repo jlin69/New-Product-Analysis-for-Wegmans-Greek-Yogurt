@@ -1,0 +1,1143 @@
+---
+title: "Case#2"
+author: "Online_group B"
+date: "11/9/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Factor analysis
+
+```{r cars}
+# install.packages("devtools", dependencies = T)
+# library(devtools)
+# install_github("vqv/ggbiplot")
+# install.packages('psych')
+# install.packages("stargazer")
+
+library(foreign)
+library(ggplot2)
+library(ggbiplot)
+library(dplyr)
+library(psych)
+library(stargazer)
+
+#Set up the work space
+getwd()
+dir = "/Users/jiayuanlin/Desktop/GBA 424/2/Case/Yogurt"
+setwd(dir)
+
+#Read files to Data
+file_name = "Wegmans Survey"#this is the name of the file
+natLabData <- read.spss(paste(filnm,".sav",sep=""),to.data.frame=TRUE,use.value.labels=TRUE,trim_values=TRUE)
+natData <- read.spss(paste(filnm,".sav",sep=""),to.data.frame=TRUE,use.value.labels=FALSE);
+
+#Focus on Q6, which start from col 47 - 59, the scales are all from 1 to 5, but with missing value
+itemNames = names(natData)[47:59]
+Q6_Raw <- subset(natData[,itemNames])
+Q6_New_Col_Name <- gsub("Question6","",colnames(Q6_Raw))
+colnames(Q6_Raw) <- Q6_New_Col_Name
+summary(Q6_Raw)
+
+#Find the correlation
+cor1 = cor(Q6_Raw, use = "complete.obs")
+stargazer(cor1[c(1:13), c(1:13)], type = "text")
+
+#Drop NA
+complete.obs = apply(!is.na(Q6_Raw), 1, all)
+table(complete.obs)
+
+#Test for dropping if affects the representativeness of the sample
+Q6_Complete = Q6_Raw[complete.obs,]
+cor2 = cor(Q6_Complete)
+sum(cor1 == cor2) / length(cor1)
+
+cor3 = cor(Q6_Raw, use = "pairwise.complete.obs")
+sum(abs(cor2 - cor3)<.05)/length(cor1)
+
+sum(abs(cor2 - cor3)<.1)/length(cor1)
+#The missing data doesn't affect the overall nature of the relationship, we can move forward.
+
+#Set up variables for interpretation dimensions (cooking or not; female or male; Age group)
+complete.obsCook = complete.obs & !is.na(natData$Question12DoyouuseGreekYogurtforcooking)
+complete.obsMale = complete.obs & !is.na(natData$Question33Areyou)
+complete.obsAge = complete.obs & !is.na(natData$Question32Forclassificationpurposesonlypleaseindicatewhichagegro)
+complete.obsAll = complete.obsCook & complete.obsMale & complete.obsAge
+
+#Run PCA
+resultPCA = prcomp(~., data=Q6_Raw[complete.obsAll,], scale. = TRUE, na.action = na.omit)
+ggscreeplot(resultPCA)
+
+#Print the rotations
+stargazer(resultPCA$rotation[,1:3], type = "text")
+#The first principle component has all variables as negative values. This implies that all
+#variables have the same basic relationship to the first principle component. However, if we look
+#closely we can find out that the taste, texture, fat level, consistency, calorie level and 
+#protein level have a much higher magnitude.
+
+#The second principle component has most variables larger than 0, especially Blended, calorie level,
+#fruit on the bottom, organic, rbSTfree, side by side cup and protein level have a much higher magnitude.
+
+#The third principle component is much more of a mix.
+
+
+#Plotting the first two factors
+png("test.png", units = "px", width=4000, height=4000, res = 600)
+ggbiplot(resultPCA, alpha = 0.1, ellipses = TRUE)
+dev.off()
+
+#Plotting with interpretation variables added
+png("testcook.png", units = "px", width=4000, height=4000, res = 600)
+gg1 = ggbiplot(resultPCA, alpha = 0.4, group = natData[complete.obsAll, 'Question12DoyouuseGreekYogurtforcooking'],
+               choices = c(1, 2), ellipse = TRUE, ellipse.prob = 0.1) + 
+  scale_color_manual(name="Variety", values=c("red", "orange", "green"))
+gg1 + ggtitle("Cooking or Not")
+dev.off()
+
+gg2 = ggbiplot(resultPCA, alpha = 0.4, group = natData[complete.obsAll, 'Question33Areyou'],
+               choices = c(1, 2), ellipse = TRUE, ellipse.prob = 0.1)
+gg2 + ggtitle("Males or Females")
+
+gg3 = ggbiplot(resultPCA, alpha = 0.4, group = natData[complete.obsAll, 'Question32Forclassificationpurposesonlypleaseindicatewhichagegro'],
+               choices = c(1, 2), ellipse = TRUE, ellipse.prob = 0.1)
+gg3 + ggtitle("Age Group")
+
+
+
+```
+
+## Word Cloud
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+# Load
+library("tm")
+library("SnowballC")
+library("wordcloud")
+library("RColorBrewer")
+txt="
+Fat free with NO artificial sweetener added    
+Availability
+Prior knowledge
+taste
+Health reasons
+Taste
+taste
+I initially selected Fage because of it's prominent product placementit was just the easiest one to try because it was so visible brand loyalty    
+Quality
+high protein and lower fat and calories
+quality
+Thickness
+familiarity
+Taste    texture    and flavor
+taste
+taste
+price
+familiar with brand - I know I like it
+I buy what's one sale    or what flavors are available    
+availability
+texture
+Known entity
+price calories
+the price that week
+THE TASTE
+What the store carries    
+sugar content
+Taste    
+Teaste
+taste!
+ on sale or  flavors 
+cost
+health
+Price - the cheaper    the better    
+calories & protein
+Protein level
+Price    
+Taste    price
+Taste
+taste and consistency    
+taste and texture
+taste and texture
+taste
+price quality
+Whichever is in stock with the flavors I like
+fat content
+Flavor
+Had Fage recommended    and we like it a lot    
+taste
+taste    flavors available
+ consistency
+I tried FIG yogurt by Three Greek Gods at Lori's Natural Foods    and I got hooked on it! 
+Fage is consistently good     The 2% version has a great taste and the individual size is a good serving size     I do find it expensive    though    
+availability
+usually only one available
+The store where I am shopping    
+I bought Fage almost as soon as you introduced it in my store (Amherst Street)and I have enjoyed it ever since    
+availability
+availability
+we are very happy with stonyfield farm products    
+ flavor and texture
+price
+Organic
+Fage has the best texture and consitency for me    
+protein
+availability    price and previous knowledge of taste
+nutrition
+Sugar content    and then price    
+brand
+taste    texture and fat content
+tried the others-like stonyfield oikos best    
+taste    textuure    organic
+nutritional value
+fat content    then taste
+I had a coupon    
+AVAILABILITY    0% FAT
+Organic
+TASTE
+nutrition information
+taste
+Price
+Fage is thicker and creamier; also has processing plant in NYS
+closest to the same taste of my homemade yogurt
+flavor available
+Taste and authenticity
+fat content    protein content
+That is the first brand that I've tried and I liked it    and I stuck with it    
+flavor
+Price and selection of flavors
+Taste
+The name    
+price
+availability and sometimes price
+I buy in bulk at BJ's and it averages out to $1    00 per 6oz carton
+taste and price
+Previous experience     I buy Fage because I know I like it    
+Price
+Sale Price and coupons
+The taste and smoothness of Fage is awesome
+flavor
+I started with Stonyfield's OIKOS brand and really liked the taste & texture very much     I haven't found a reason to change brands
+As small amount of sugar as possible    creamy texture
+variety of flavors
+sugars and carb counts    
+taste
+Dannon is terrible    very chalky     Chobani and Fage taste the best    Chobani is cheaper than Fage
+Taste
+The Fage brand has a thicker texture    which I like     The Oikos brand (with fruit) tends to have a pool of liquid on top which I don't like            (stays thin even when fruit mixed in    )
+size for the price
+I love chobani     I do not like any others     the taste and the clories per ounce is exactly what I want along with the protein content    
+THE TASTE AND THICKNESS
+price
+Size and availability
+Prior experience with the brand     High satisfaction    
+The other brands taste like chalk    
+taste
+best taste  texture of those I have tried
+Flavor    
+n  a
+taste
+consistent flavor and texture
+non-fat
+0% fat
+price
+It was recommended to me and I like it     Occasionally I'll try a container of another brand    but I usually stay with Fage    
+2% available
+I tried Fage and Oikos    I like the taste of Oikos better
+Taste
+I can buy Chobani in a large container    which is cheaper than smaller containers    
+0% fat
+that is what I started with - haven't felt the urge or gotten an incentive to experiment    
+Taste
+Overall quality
+My husband loves Fage
+natural or organic    then sugar level
+Taste
+organic    no artificial ingredients  additives
+if available    I buy locally produced     #1 reason at supermarket is fat-free and sugar-free
+Price & familiarity-if I've had it before
+pricing
+Flavor choices    
+recommended by several friends
+Price
+Sugar content
+Taste
+brand
+price
+flavor   texture
+price
+Fage from Trader Joe's was the first one that I learned about    and I know it's going to be good     Now that we don't live close to a TJ's I get it wherever I can find it    but if I have coupons for another brand that's not flavored    I might get that    
+taste
+I can get it in the large container    
+The price and nutritional info
+Organic    from a  real  company (i    e        a small company) with integrity    
+Taste    protein to calorie ratio
+it's what I am used to
+I know the brands i like
+I like Fage because I ate that brand in Greece
+taste price
+Flavor
+price
+It's in stock and it's natural    
+Organic    natural ingredients    
+Taste    
+it was the brand that a coworker was eating
+Taste
+teste    smooth consistency    0% fat
+Taste
+taste
+price    appearance
+taste
+Taste
+texture and taste
+taste
+It was the first Greek Yogurt I ever tasted                and I was hooked     So why change brands???
+Price
+Fage tastes best    
+fage was my original purchase and I enjoy it
+sugar
+I've only ever tried Fage    but I like it so much I've never tried any other    
+Taste
+healthy contents no fake stuff
+quality and name recognition
+Mostly because it's the one I'm most familiar with    
+Taste and price
+If it happened to be the first brand I tried and I liked it    I just keep buying it            
+flavoring and price
+Thicker texture     Buy Stonyfield now as I shop primarily at Wegman's and haven't found another store that carries Fage    
+flavor    creamy
+i'm not sure    i guess it's because a greek person suggested it to me as the best
+Familiarity
+I first purchased it through the high recommendation of Hungry Girl newsletter    and because it was fat-free     I continue to purchase because of its taste and versatility    
+taste
+Taste
+Taste
+I buy whichever is plain with all the fat in place            do not care for reduced or fat-free
+Lowest Carboydrate level is top priority    followed by highest possible level of protein     I don't care about fat level at all    
+Flavor
+taste
+Recommended by someone
+taste    texture
+taste
+texture
+low calorie with great taste!
+overall consistency and taste
+first time was random    but i really enjoyed it             would consider another brand if there was a significant price difference     if there was a Wegman's brand    i would try that as i generally purchase Wegman's brand items when there are available    
+Price 
+It is the only one Wegman's offers in Niagara Falls
+ON sale
+taste
+consistency and thickness
+Best texture  taste    
+best combination of taste and nutrition
+b  c it's 100% organic
+Taste
+taste
+price
+Taste
+texture
+It's the thickest    best consistency I have come across    
+Flavors available
+availability
+taste
+Taste
+Available
+I love the taste
+flavors available
+Its organic
+Fruit on the side and not blended in the yogurt    
+Taste
+It's the one I prefer most    
+flavor
+ flavor and consistency
+price
+Taste
+I like the brand I buy
+Availability
+taste
+They are the brands I am most familar with and I know what to expect
+Fage offers the creamiest texture and mildest taste for the fat content
+familair 
+Fruit Flavors
+Texture and taste
+Taste
+acquainted with Fage
+organic
+what is available
+Taste
+because of texture and taste
+taste
+Previous positive experience
+taste and texture and because it is local
+consistency of fage with honey
+ taste 
+Price
+Thickness
+price
+I like Fage    waiting for Wegmans brand
+taste
+health value
+availability
+Same as last question - consistency and flavor
+like the taste
+taste
+Taste
+Fage offers a large container where the others don't     Greek yogurt is expensive anyway but the smaller containers are even pricier    
+I BUY WHAT WEGMAN'S CARRIES
+Taste
+mostly what the flavors that are available at the time
+Price    
+Texture and flavor tie    
+cost    taste
+I like it
+price and taste     It is much cheaper to make your own    
+taste -- Chobani has the best taste
+fat content
+less sugar
+Organic
+organic
+price    no added ingredients
+flavor
+taste
+availability    if choices available-then lower price
+Flavor
+Because I have purchased it in the past    and I know the taste and consistency are what I like    
+I try to buy the organic brand if possible    
+same as question #13 plus taste and texture    
+price
+Suggested by diabetic counselor
+taste
+Brand 
+tried it and liked it
+taste
+taste
+price
+Taste    textue and price
+This is the brand I see at the store and it's good    
+taste
+availability
+Because I like the texture and taste    
+Price    
+taste
+availability
+taste
+Taste
+price
+It's a combination of available flavors and sizes     Also price    
+Availabitity    
+protein content
+I enjoy the honey they add to one particular brand and the consistency    
+Taste
+taste  texture
+I like the taste    texture    and ingredients
+like the taste
+past experience    fat content (sometimes one brand has only 0% fat and I don't like that)
+quality
+Pasture-raised cows - more important than organic     If available    it'd be even better if made from raw milk    which is why I *often* make my own yogurt rather than buying it    
+taste
+availability
+Taste and fat content
+cholestrol================
+Toss of a coin    
+Price and flavor selection
+I am new to this so I am not sure of all the brands that are available and where in the store they would be located     Only just recently found oikos in the health food section    
+price
+Texture
+price but only within reason     If a brand I don't like is on sale    I still won't buy it    
+Taste
+taste price
+Health 
+Price
+Price
+taste
+what is available
+Organic
+Price & taste
+ flavor and its longevity and  large size option
+cost
+taste    consistency
+accustomed to purchasing stoneyfield yogurt
+Taste
+price
+I love everything that Stoneyfield Farms stands for    
+taste    consistency
+taste
+Familiar with quality of brand and have used it while in Greece
+ price & organic    
+price
+all factors combined
+texture
+flavor  taste
+It was recommended to me    
+taste
+Texture
+it isn't too tangy and it's thick
+prefer organic but must taste good
+All natural    
+coupons!
+taste
+organic
+taste
+nutrition
+thickness
+First one was FAGE and stayed with it
+Taste and protein level
+it tastes so good
+thickeness
+Taste and use by date    
+amount of sugar in it and amount of protein
+flavor
+taste and texture
+Texture -- chobani's fat free is better than Stonyfield FF or Low fat    
+I've only tried Stonyfield Oikos b  c my Wegman's only carries Oikos and Dannon and Oikos is always in stock    
+TASTE
+Taste
+Taste    texture    nutrition information    selection
+I look at the fat    calorie and sugar content    
+Flavor    
+texture taste
+taste and container--like a lid I can reclose
+consistency
+Taste and availability in fat free and in a larger container    
+Taste
+Taste
+Taste and then price    
+It is in Natur'es Marketplace and is a brand I am familiar with
+price
+heresay
+I think Fage tastes the best    
+Fage has a wonderful texture and flavor    
+Nutritional value
+Thick    creamy consistency
+Fage is a brand I bought while in Greece     I also like Trader Joe's    but I can't get that in Williamsport     I don't like the Stonyfield brand which is the only other option we have    
+price
+Availability
+price relative to taste
+availability
+Texture thickness (the thicker the better)
+price
+Had a coupon    of course!
+taste
+Flavors available
+taste
+ Consistency
+Consistent high quality and flavor    
+price
+price
+creaminess
+size of the containers
+Taste
+It is sold in the natural food section and I perceive a higher quality     I like it    
+protein and sugar content
+availablity
+flavor
+price and availability
+taste and texture
+Taste
+taste
+Consistency
+Still experimenting with different brands
+I have tried others and Fage is widely available and tastes great
+LOW calorie AND low fat
+It's the best so far     I do not like yoplait
+I do not like the tastes of the other brands    
+Flavor
+price
+organic
+texture    flavor    protein
+Taste and texture
+Availability and price
+Organic
+Price
+taste
+Protein
+Taste     I get consistency in taste with Chobani    
+overall best- most protein and taste
+Chobani is the best
+taste
+Taste and quality
+size of container compared to price
+High protein level and texture    
+what is in the store makes a difference
+protein levels
+I like its taste the best (Fage)    
+organic
+Price
+availability
+I like the texture
+Having tasted it before
+authenticity    or as close to it as I can find
+taste
+Fage offers the larger tub which lasts the week    
+taste
+taste and texture
+Taste preference
+taste and availability
+Taste
+advertisement
+lactose tolerance in Fage
+Organic
+The consistency (i    e        I don't prefer the Dannon Greek b  c it doesn't have the right consistency)    
+taste
+what's in stock and familiarity
+It's what I like    
+Taste and texture are superior in Fage     I have tried other brands and I don't care as much for them    
+I can trust the tast and texture    
+on sale or flavor
+flavor
+I was first introduced to Fage and liked it    Have been using it every since    Others don't seem as thick    
+it was the cheapest
+taste
+in the organic section    looks most authentic
+price
+Tatse!
+low carbohydrates
+taste
+taste
+Amount and variety of helpful bacteria
+sometime the fat content and the flavoring    
+The Fage brand is the richest    creamiest one     It is the closest thing to making Greek yogurt yourself    
+price taste   organic
+Taste
+like Fage better than the other greek-style brands
+price
+PRICE    COUPON
+My husband can eat regular yogurt and so I buy him the greek    Greek still brothers my lactose intolerence     The goat yogurt you sell is wonderfu for me!!!!!
+Health benefits
+I just tried the yoplait and it's sugar is less
+taste & Texture
+Taste
+resipe
+Sometimes it's just where I happen to be shopping     But also price and size of container available    
+organic
+Familiar brand    
+good in all aspects
+Best value
+I have liked Chobani     The greek yogurt is more expensive so i don't want to waste money trying ones i may not like     I would try if on sale though    
+quality
+what i like
+Flavors available in 4 oz size    
+taste    price
+organic
+familiarity with brand
+no hormones added
+Taste
+taste and texture
+I've used it before    
+taste
+Price
+I've tried it and I liked it    
+texture & flavor
+Taste
+Taste    texture
+taste
+I like the taste    
+Flavors available
+Well for one    I make sure it's fat-free     I'm trying many brands right now before I settle on a really favorite     Texture is important as well as taste    
+Only brand I can find at Wegmans    coupons
+preference
+Like the taste    texture and quality    
+the flavor
+Please see my remarks for #13 and know that I am loyal to Fage    
+price
+the price     32 oz of Chobani plain at BJs is $4    99     16 oz of FAGE 0% at Wegman's is $5    49    
+reputation    quality    taste
+taste
+because I have used it before and really like it
+Fat content and flavor
+Fat content  ingredients     I want 0% fat with no weird ingredients    
+organic
+%of fat and calories
+TRY TO SELECT ONE THAT I FEEL IS THE MOST AUTHENTIC
+Fage -- because it was the first one available that I knew of    
+taste & consistency
+taste
+prefer organic
+We LOVE the flavor and texture of Fage     It's not too sweet    
+Quality
+I like the texture and flavor of Fage
+price
+I think the reason I tried and stick with face is it tastes great every time I eat it    
+Flavor
+The flavor
+Texture and taste
+Flavor
+tried it before and liked it
+Fage tastes best and has the best consistency    
+Taste
+taste
+I pick the one that produces consistently good tasting yogurt that has the lowest cals and the highest protein     Great for dieting!
+taste
+TASTE
+health bebefits
+Price and past experience    
+Taste
+taste and consistency preference
+calories and fat content
+Smoothness
+taste    texture and protein
+Mostly    the ingredients     But    sometimes the price    
+Trust in brand name    
+price
+taste and texture    
+natural ingredients
+taste
+organic
+the protein content    the taste and the texture
+quality
+Simply because Wegman's has it in its cases
+Haven't noticed that many other brands
+recommended by a friend
+Taste
+Fage has the best consistency     It is very smooth and creamy    
+I've seen only 2 brands and I like Fage better than the other     The other would have to be 1  2 the price of Fage for me to purchase it    
+coupons
+availability
+I love the creaminess and texture of the yogurt    
+had a coupon for it
+Taste
+taste
+I like having the yogurt and the honey separate     I don't really like the blended or stuff on the bottom kind    although if that is all there is I will get that kind    
+price
+cost
+taste (but price is a downfall as Greek yogurt is very expensive in comparison to traditional yogurt) I would buy more if price was cheaper    
+Flavor
+Husband requested it    
+taste & texture    
+Experience and satisfaction with the product    
+past positive history
+most familiar with Fage
+taste & natural w   no hormones
+Taste and texture    !!
+fat content    price    protein content
+price and flavor
+Price and quality
+It has to be organic
+Price
+Price
+Stonyfield is my favorite brand of regular yogurt    
+I've tried others and keep going back to the taste of Fage    
+My girlfriend told me about it     I am now hooked! The brand I tried was perfect so why mess with a good thing    
+taste
+Price
+Organic
+price
+flavor
+I want something that's more authentically Greek    
+I first found Fage and I guess it is familiarity that causes that choice    
+Hi protein gms r  t carb grams    thick texture
+Live cultures
+price
+I use fage unless I have a coupon     I'd like to try other brands that cost less     As I only purchase at Wegmans I can only purchase the brands that are stocked at the Ridgemont store    
+taste
+If it's Fage                  it's a  treat  for myself     If it's yoplait    it's because I have a coupon    
+taste!
+taste
+Coupon
+It was pretty much the only brand available    
+familiar with brand's other products
+texture    fat content    protein level    flavor    taste
+taste
+The quality of the yogurt is important    
+taste
+I'm familiar with the Stoneyfield Brand    
+price and fat  protein
+consistancy    taste
+Taste
+flavor    fat content    consistency
+Taste
+The place I go and what they have available
+Only one available for the price
+taste
+Taste    consistency    protein level
+taste    texture    availability
+have liked stonyfield products
+Taste and consistency    
+the best tasting    
+Organic    
+price
+packaging
+I like the Chobani fruit on the bottom because it is easier to eat than the Fage which is separated     I also like the flavors and plain yogurt taste more than others that I have tried    
+Price
+purity of ingredients
+Flavor
+Fat and sugar content
+Taste
+Brand that I've tried and liked very much - no need to switch! :o)
+tastes good and not many to choose from
+price
+I select Stonyfield Oikos for its taste and also it is organic     Don't like Chobani's taste     Fage is my 2nd favorite    
+no reason    i like to try differnent brands
+real greek is better than fake greek
+Taste
+Price
+organic
+Fage is the best            I have had others    
+taste
+fat & protein content    flavor
+price
+Flavor
+flavor and texture
+Fage or Okios usually based on price
+First it needs to be good quality    but price and having coupons factors in also     Greek yogurt is expensive so I usually only buy what I have a coupon for    
+After trying a couple of other brands    I find Fage to be best    
+There aren't many brands to choos from    so i usually look at the price    
+Taste
+taste
+price
+taste
+consistency
+taste and texture
+available flavors
+Taste    taste    taste    fat free    high protein
+taste
+flavor
+reputation
+Price and ingrediants     I preferably choose organic    
+fage was the first I read about    so I tried it first
+flavor
+I typically choose between two; whichever of those two is cheaper    
+price
+organic
+Texture first    then taste     I enjoy Chobani brand and Wegmans does not carry it    
+recommended by friend
+taste
+cheapest!
+protein level and taste
+taste
+taste then price
+taste & i prefer side by side except for the chocolate & caramel oikos which i eat like a dessert
+flavors and price that week
+Usually - all things being equal - I go for price     As long as it's organic    fat-free    and tastes good    that is the last criterion    
+thickness    texture
+Reputation
+flavor
+consistency   
+Texture
+Taste (Fage preferred)
+Cost
+Better taste     I have sampled several    and Chobani is the best     I can never find it at Wegmans    so I shop at Giant on weeks that I want yogurt    
+I loved their regular yogurt     Tried other Greek yogurts and still like the one I buy best    
+Price and availability
+I only buy Chobani    I have tried Oikos & Fage and it just doesn't compare    
+I have only eaten Fage    
+I tried this one and liked it     I haven't noticed the others to try them    
+taste
+Taste
+Organic    and trial and error tasting
+quality and texture
+taste
+Taste - the Yoplait was just too gritty
+The taste
+tasted it at Wegmans!
+I like the flavor and the double compartment package    
+taste
+had it once and it taste good
+Not too  bitey ; like fruit added
+texture and flavor
+price and flavors
+taste
+I choose Stonyfield because of the ratio between Calories    Fat and Fiber     It is only 2 POINTS (Weight Watchers) vs other brands of Greek yogurt     Besides I love the taste the best!!
+low sodium content
+texture and taste
+flavor
+price
+taste    price    consumer reports
+Taste and texture
+taste
+Taste
+taste    price
+Price    
+read about it in the paper or magazine
+Usually the store or has one or two brands to choose from
+Price
+price and copupon availability and of course taste
+cost
+I've only really had Fage and Chobani    but the Chobani separated sooner    and didn't seem as thick    
+Simple natural ingredients with live yogurt cultures
+I can purchase the larger container of Chobani at BJ's when I want a larger quantity
+flavor            then protein level            overall  goodness  of product        (organic    all natural)            price
+Fage total is not reduced fat and has a better consistency and low-carb appeal
+Fage has fat-free and plain     Others don't    
+Taste
+the taste
+The taste    
+Quality - not a johnnny come lately with no substance    just a label    
+taste
+just like the taste and consistancy better
+Fat content
+calories
+Creaminess    
+Taste and thickness  creaminess
+THe taste and flavor
+taste
+Price at first     If I like it    I stick with it    
+Stonyfield is a name I can trust - high quality
+My niece introduced me to Fage and I like it very much    
+texture and taste
+taste
+Protein and taste
+haven't tried anythng but chobini
+I have only tried one brand     When Wegmans first started to carry Greek yogurt    it was the only one    
+nutrional content adn taste
+Taste
+I trust the fact that it all natural and I really notice the difference in taste and mixes with other food items    
+like the flavor  fruit choices
+I like it the best    
+price
+It must be organic    
+Have only been able to find tha Chobani brand     Would like to try others    
+Price and previous experience     I don't care for Chobani after trying it    and would purchase Fage all the time    but Oikos is more budget friendly    
+price and quality
+how it tastes
+taste    texture
+price            
+It's advertising    
+Taste
+Availability
+greek yogurt is more expensive     i make a smoothie most mornings for breakfast   too expensive to use in quantity this often     when am making indian meals would prefer greek yogurt     like the tang -full bodied goat taste    
+Low carbohydrates    
+taste
+Price    
+Checking what the store has to offer and if there are any sales    
+Hard to choose but it's the texture and also the taste     BOTH    
+price & coupon
+price
+No fat
+taste
+availability
+taste
+taste
+Price     I really haven't tried very many brands of greek yogurt because i am trying to save as much money as possible
+Because of the texture and flavor
+taste
+I had a coupon for the Oikos once and then just continued using it    
+taste
+consistency of CHobani is the best    
+Protien level    low fat & taste
+texture
+taste
+price
+taste
+better for me
+reputation
+availabilility and price
+Price
+I check the ingredients panel for additives and fillers     Price plays a big role    too    
+Mouth-feel
+the thickness of the yogurt
+Price
+price
+Flavor & texture
+ingredients listed - I want the best for the expense    
+organic
+There is currently only one brand available at the Wegman's I shop at     If I had the choice I would base my choice on flavors available and cost    
+Wherever I'm located in the store and remember I grab it
+taste    texture
+flavor
+Fage - it was the first and so far the best     My wegman's doesn't carry the yoplait greek yogurt
+price
+the flavor
+Taste     Prefer Fage    then oikos then all others    
+Familiarity
+taste and texture
+What is available in plain at the time and price     Only buy Stonyfield if no other    
+Price and flavor
+price
+pricing
+I had a coupon    
+Taste
+Price & taste    
+Price
+Price -- I usually choose among any that are on sale    or I opt for Chobani    which tastes great and it's usually priced at 1    25
+Taste    
+taste that my kids will like
+protein amount
+taste and consistency
+taste
+most variety of flavors
+Taste
+taste
+price    protein
+Fage is thicker and creamier to me     I really like its consistency    
+I prefer the taste
+I only recently tried Greek Yogurt     It was the first brand I saw and one that mentioned not having added growth hormones on their label     I diligently have eliminated added growth hormones from my diet    
+calorie    fat    price    flavor
+Organic
+flavor & satiates my appetite
+texture
+Taste
+Generally cost
+taste
+previous experience
+Taste and consistency
+taste
+Best taste and protein
+taste
+price
+prefer chobani
+cost
+texture and taste
+taste
+Oikos is the only brand wegmans carries in single serving size that is a somewhat reasonable price    
+Organic
+familiarity    taste
+Taste
+Organic            soy            low fat
+taste and texture
+Consistency
+Ingredients    then price    
+probiotics    organic    and vanilla flavor
+Like the flavor
+nutritional score
+availability in stores and overall taste and texture
+Price
+taste
+thicker   
+I liked the traditional yogurt by Stonyfield farms    
+flavor
+See previous answer    
+flavor and texture
+price    sale
+Taste and consistency and fat  calorie content    
+taste
+taste    texture
+taste    quality
+taste    consistency
+I've tried other and like it the best
+taste
+Natural ingredients    
+Being the real    strained type     FAGE    Oikos and Chobani are    Yoplasot is imitation with gelatine added to thicken it to look like strained    
+taste    
+Price because I only buy high quality
+Texture    
+taste
+price
+Price
+flavors
+It is the best!! I had it for the first time in Greece years ago     I have been sold ever since    
+flavour
+price
+availability of brand in the store I happen to be shopping at that day
+There's more than one factor     Price and organic
+I like the quality    good texture and taste
+price
+quality    price    stick to brands i know i like
+organic
+organic and price
+Only buy Stoneyfield for previous reasons    
+Price and if we have a coupon for money off the price
+Comparable taste test
+price    
+I have tried Chobani in the past and liked it     I have looked for other brands of greek yogurt (Yoplait and Stonyfield Farms) and have been unable to find them    
+Texture and amount of natural ingredients     Fage is our preferred brand (Stonyfield's only if we can't find Fage -- and we find it a bit 'watery')    
+fat free options
+I am loyal to Fage brand for many years- before it was pasturized when imported and waited for it to return to USA     Was near a year for it to return     Taste says it all    
+availability - my Wegmans only carried Fage for a while    so I got used to that brand     If I had more choice    I would select an organic brand    and then my next choice would be local
+We choose Chobani because we feel it has the best taste of the Greek yogurts    
+FULL FAT
+organic
+taste along with nutrition facts
+Its the one I can find in the store
+Taste    readily available
+I was given a sample of the Oikos yogurt at a Wegmans store and thought it was delicious     When I first bought it    that was the only brand available     I have since tried Yoplait because I had a coupon for it     It is also good    but I still prefer Oikos    
+Best taste    least sour    
+Previous experience with taste    
+I heard that the brand I have bought is kind of like a pudding texture    
+taste
+If I see  organic  on the label    that usually will be the yogurt I will choose    
+Because Fage tastes the best    bar none    
+taste and cost
+I've only found Oikos and Fage in the Wegmans I shop in or I would try other brands    
+taste
+Flavors available    
+quality of product and taste
+Flavor and texture
+price
+the thick creamy texture    
+I select Oikos because I can find it in the stores--it's popular     I have coupons for the other brands    but I can't find them in Wegmans    so I just buy the Oikos     The other major reason is the high protein    which  holds  me until the next meal    AND the low sugar    
+Price
+taste
+price
+usually price comparison
+taste
+I like Chobani the best    it tastes better than the others    but Wegman's doesn't carry Chobani     Chobani isn't as sour    
+Size    availability of flavors    
+Taste    single serving size    availability    
+novelty    new flavor
+Taste
+taste
+Sale price
+Side by side design with Fruit and yogurt    
+natural ingredients
+easy to get - I have a trader joes right by work    
+for the texture    consistency    0 fat
+HAVE TRIED IT AND LIKE IT
+past experience
+same   more creamy and filling
+consistency
+Taste
+organic
+availability
+Which of the 3 brands I prefer happen to be in the store when I am shopping    
+not sure
+coupon is first and if it is on sale
+thickness an richness at 0 fat
+Texture then taste
+Fage recommended to me    
+Taste
+Taste and price
+tried it and loved it
+price
+Taste
+had a coupon now like it a lot
+price
+Fewest number of calories
+texture
+organic  grass fed cows  familyfarms
+Sugar content    
+familiar with quality
+organic   rbst free   
+high protein content
+availability
+familiarity"
+
+# Load the data as a corpus
+docs = Corpus (VectorSource(txt))
+# Remove numbers
+docs = tm_map ( docs , removeNumbers )
+# Remove punctuations
+docs = tm_map ( docs , removePunctuation )
+# Eliminate extra white spaces
+docs = tm_map ( docs , stripWhitespace )
+# Convert the text to lower case
+docs = tm_map ( docs , content_transformer(tolower))
+# Remove english common stopwords
+docs = tm_map ( docs , removeWords , stopwords ("english") )
+
+# Build a term-document matrix
+dtm = TermDocumentMatrix ( docs )
+matrix = as.matrix (dtm)
+words = sort ( rowSums ( matrix ) , decreasing = TRUE )
+df = data.frame ( word = names ( words ) , freq = words )
+
+# Generate the Word cloud
+set.seed(4321) # for reproducibility
+wordcloud(words = df$word, freq = df$freq, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+# Generate the Word Frequencies Plot
+head(df, 10)
+barplot(df[1:10,]$freq, las = 2, names.arg = df[1:10,]$word,
+        col ="lightblue", main ="Most frequent words",
+        ylab = "Word frequencies")
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
